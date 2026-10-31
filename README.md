@@ -1,59 +1,116 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# Client Management API
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+Laravel backend for the Client Management System. Provides CRUD operations for
+clients and calculates service charge, discount value and final project value
+automatically.
 
-## About Laravel
+## Tech Stack
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+- Laravel 12
+- PHP 8.2
+- MySQL
+- nwidart/laravel-modules
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+## Setup
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+1. Clone the repository
 
-## Learning Laravel
+2. Install dependencies
+   composer install
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework. You can also check out [Laravel Learn](https://laravel.com/learn), where you will be guided through building a modern Laravel application.
+3. Create the environment file
+   copy .env.example .env
 
-If you don't feel like reading, [Laracasts](https://laracasts.com) can help. Laracasts contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+4. Generate the application key
+   php artisan key:generate
 
-## Laravel Sponsors
+5. Create a MySQL database named `client_management`
 
-We would like to extend our thanks to the following sponsors for funding Laravel development. If you are interested in becoming a sponsor, please visit the [Laravel Partners program](https://partners.laravel.com).
+6. Update the database settings in .env
+   DB_CONNECTION=mysql
+   DB_HOST=127.0.0.1
+   DB_PORT=3306
+   DB_DATABASE=client_management
+   DB_USERNAME=root
+   DB_PASSWORD=
 
-### Premium Partners
+7. Run the migrations
+   php artisan migrate
 
-- **[Vehikl](https://vehikl.com)**
-- **[Tighten Co.](https://tighten.co)**
-- **[Kirschbaum Development Group](https://kirschbaumdevelopment.com)**
-- **[64 Robots](https://64robots.com)**
-- **[Curotec](https://www.curotec.com/services/technologies/laravel)**
-- **[DevSquad](https://devsquad.com/hire-laravel-developers)**
-- **[Redberry](https://redberry.international/laravel-development)**
-- **[Active Logic](https://activelogic.com)**
+8. The API base url is
+   http://localhost/client-management-backend/public/api
 
-## Contributing
+## API Endpoints
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+| Method | Endpoint | Description |
+| --- | --- | --- |
+| GET | /api/clients/getalldata | Get all clients |
+| POST | /api/clients/storeclient | Add a new client |
+| PUT | /api/clients/updateclient | Update phone, address and project budget |
+| DELETE | /api/clients/deleteclient?id= | Delete a client |
+| GET | /api/clients/searchbyphone?phone= | Search clients by phone number |
 
-## Code of Conduct
+## Calculation Rules
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+Service Charge, based on the project budget
 
-## Security Vulnerabilities
+| Project Budget | Service Charge |
+| --- | --- |
+| 1,000,000 and above | Project Budget * 10% |
+| 500,000 to 999,999 | Project Budget * 5% |
+| Below 500,000 | Project Budget * 2% |
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+Discount Value, based on the number of employees
 
-## License
+| Number Of Employees | Discount |
+| --- | --- |
+| More than 100 | Project Budget * 5% |
+| Less than 100 | Project Budget * 2% |
+| Not given or exactly 100 | 0 |
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+Final Project Value = Project Budget + Service Charge - Discount Value
+
+These values are calculated when a client is created and calculated again when
+the project budget is updated.
+
+## Architecture
+
+The project uses the Repository Pattern with Laravel Modules.
+
+Modules/ClientManagement/
+  app/
+    Models/Client.php
+    Repositaries/ClientInterface.php
+    Repositaries/ClientImplementation.php
+    Http/Requests/AddClientRequest.php
+    Http/Requests/UpdateClientRequest.php
+    Http/Controllers/ClientManagementController.php
+  database/migrations/
+  routes/api.php
+
+The controller depends on ClientInterface instead of the implementation class.
+The interface is bound to ClientImplementation in app/Providers/AppServiceProvider.php,
+so the database logic can be changed without changing the controller.
+
+The three calculations are written as private methods inside the implementation
+class, so the same logic is used by both the store and the update methods.
+
+## Assumptions
+
+1. Number Of Employees field
+
+   The discount rule depends on how many employees a company has, but this field
+   is not listed in the Add Client fields in the specification. A nullable
+   no_of_employees field was added to the clients table and to the Add Client
+   form. If it is left blank the discount becomes 0, which matches the
+   "Otherwise Discount = 0" rule in the specification.
+
+2. Client reports
+
+   The specification lists the fields a client report should include, and these
+   are the same fields listed under View All Clients. The View All Clients table
+   displays all nine fields, so it is used as the client report.
+
+## Author
+
+Sarah M.D.
